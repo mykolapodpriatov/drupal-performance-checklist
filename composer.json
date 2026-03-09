@@ -1,0 +1,17 @@
+{
+    "name": "nikolaj/drupal-performance-checklist",
+    "description": "Pre-production performance checklist for Drupal 10/11.",
+    "type": "drupal-module",
+    "license": "MIT",
+    "keywords": [
+        "drupal",
+        "drupal11",
+        "performance",
+        "checklist"
+    ],
+    "homepage": "https://github.com/example/drupal-performance-checklist",
+    "require": {
+        "php": ">=8.3",
+        "drupal/core": "^10.3 || ^11"
+    }
+}

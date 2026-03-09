@@ -1,0 +1,33 @@
+# PHP / Composer
+/vendor/
+composer.lock
+
+# Drupal local
+sites/default/files/
+sites/default/settings.local.php
+sites/default/services.local.yml
+*.sql
+*.sql.gz
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# DDEV
+.ddev/
+.tarballs/
+
+# Test/coverage artifacts
+.phpunit.result.cache
+coverage/
+build/
+
+# Logs
+*.log
