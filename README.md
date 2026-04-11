@@ -30,7 +30,13 @@ Three ways:
 
 1. **Read top to bottom** before your first major prod release. Most teams ship with 3-5 items from this list misconfigured.
 2. **Skim by section** when chasing a specific symptom (TTFB high, cache hit ratio low, image bandwidth blowing the budget).
-3. The bundled Drush command (in a follow-up commit) automates the checks that *can* be automated.
+3. **Run the bundled Drush command** to automate the checks that *can* be automated:
+
+   ```bash
+   ddev drush perf:audit
+   ```
+
+   See [`drush_perf_audit/`](./drush_perf_audit) for the module.
 
 Markers used below:
 - ✔ = should be true in production

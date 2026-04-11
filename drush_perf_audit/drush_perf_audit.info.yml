@@ -1,0 +1,8 @@
+name: 'Drush Performance Audit'
+type: module
+description: 'Adds the drush perf:audit command suite for inspecting Drupal performance configuration.'
+package: 'Performance'
+core_version_requirement: ^10.3 || ^11
+configure: drush_perf_audit.settings
+dependencies:
+  - drupal:system

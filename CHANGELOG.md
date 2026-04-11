@@ -8,12 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Expanded checklist with database, image styles, JS/CSS aggregation, HTTP caching sections.
+- `drush_perf_audit` module providing the `perf:audit` aggregate command.
+- Service registration via `drush_perf_audit.services.yml`.
+- `drush/drush ^12 || ^13` requirement in composer.json.
 
 ## [0.1.0] - 2026-03-09
 
 ### Added
 - Initial README with sections on caching layers, BigPipe, render arrays.
+- Expanded checklist with database, image styles, JS/CSS aggregation, HTTP caching sections.
 - MIT license, baseline `.gitignore`, `composer.json` scaffolding.
 
 [Unreleased]: https://example.com/changelog/HEAD

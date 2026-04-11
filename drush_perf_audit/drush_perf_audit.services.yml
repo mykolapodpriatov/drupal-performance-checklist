@@ -1,0 +1,8 @@
+services:
+  drush_perf_audit.commands:
+    class: Drupal\drush_perf_audit\Commands\PerfAuditCommands
+    arguments:
+      - '@config.factory'
+      - '@module_handler'
+    tags:
+      - { name: drush.command }
