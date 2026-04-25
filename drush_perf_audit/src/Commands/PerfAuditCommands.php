@@ -6,8 +6,8 @@ namespace Drupal\drush_perf_audit\Commands;
 
 use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
-use Drupal\Core\Site\Settings;
 use Drush\Commands\DrushCommands;
 
 /**
@@ -30,23 +30,29 @@ final class PerfAuditCommands extends DrushCommands {
   protected ModuleHandlerInterface $moduleHandler;
 
   /**
+   * The default database connection.
+   */
+  protected Connection $database;
+
+  /**
    * Constructs a PerfAuditCommands object.
    */
   public function __construct(
     ConfigFactoryInterface $config_factory,
-    ModuleHandlerInterface $module_handler
+    ModuleHandlerInterface $module_handler,
+    Connection $database
   ) {
     parent::__construct();
     $this->configFactory = $config_factory;
     $this->moduleHandler = $module_handler;
+    $this->database = $database;
   }
 
   /**
    * Run the full performance audit.
    *
-   * Inspects production-relevant configuration values, enabled cache modules,
-   * and a handful of settings.php constants. Prints a single table of
-   * findings.
+   * Aggregates checks from cache-status and inspects a handful of generic
+   * production settings. Prints a single table of findings.
    *
    * @command perf:audit
    * @aliases pa
@@ -67,9 +73,9 @@ final class PerfAuditCommands extends DrushCommands {
   public function audit(): RowsOfFields {
     $rows = [];
 
-    $rows[] = $this->checkModule('page_cache', 'Anonymous internal page cache module.');
-    $rows[] = $this->checkModule('dynamic_page_cache', 'Caches authenticated requests minus auto-placeholders.');
-    $rows[] = $this->checkModule('big_pipe', 'Streams personalised placeholders after the cacheable shell.');
+    foreach ($this->collectCacheChecks() as $row) {
+      $rows[] = $row;
+    }
 
     $rows[] = $this->checkTwigDebug();
     $rows[] = $this->checkErrorLevel();
@@ -77,14 +83,213 @@ final class PerfAuditCommands extends DrushCommands {
     $rows[] = $this->checkJsAggregation();
     $rows[] = $this->checkPageMaxAge();
     $rows[] = $this->checkReverseProxy();
+    $rows[] = $this->checkBigPipe();
 
     return new RowsOfFields($rows);
+  }
+
+  /**
+   * Report the status of Drupal's page-caching modules and max-age.
+   *
+   * @command perf:cache-status
+   * @aliases pcs
+   * @field-labels
+   *   check: Check
+   *   status: Status
+   *   detail: Detail
+   * @default-fields check,status,detail
+   *
+   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+   *   Findings as a table.
+   */
+  public function cacheStatus(): RowsOfFields {
+    return new RowsOfFields($this->collectCacheChecks());
+  }
+
+  /**
+   * Best-effort scan for deprecated render-API usage in custom code.
+   *
+   * Walks the custom-module directory and grep-matches a small set of known
+   * antipatterns. False positives are expected on copy-pasted vendor code;
+   * the report is intended as a starting point, not a verdict.
+   *
+   * @command perf:render-deprecated
+   * @aliases prd
+   * @option path
+   *   Override the directory scanned. Defaults to modules/custom.
+   * @field-labels
+   *   file: File
+   *   line: Line
+   *   pattern: Pattern
+   *   excerpt: Excerpt
+   * @default-fields file,line,pattern,excerpt
+   *
+   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+   *   Matches as a table.
+   */
+  public function renderDeprecated(array $options = ['path' => NULL]): RowsOfFields {
+    $base = DRUPAL_ROOT;
+    $relative = $options['path'] ?? 'modules/custom';
+    $root = rtrim($base, '/') . '/' . ltrim($relative, '/');
+
+    $rows = [];
+    if (!is_dir($root)) {
+      $this->logger()->warning(dt('Scan path @p not found, skipping.', ['@p' => $root]));
+      return new RowsOfFields($rows);
+    }
+
+    $patterns = [
+      'drupal_render() call' => '/\bdrupal_render\s*\(/',
+      'render() inside preprocess' => '/->\s*render\s*\(\s*\$build\s*\)/',
+      'raw #markup string' => '/#markup\'\s*=>\s*\$(?!safe|markup)[A-Za-z_]+(?!.*Markup::create)/',
+      'missing #cache (block build)' => '/public function build\(\)\s*\{(?:(?!#cache).){1,400}return\s*\[/s',
+    ];
+
+    $iterator = new \RecursiveIteratorIterator(
+      new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+    );
+
+    foreach ($iterator as $file) {
+      /** @var \SplFileInfo $file */
+      if (!$file->isFile()) {
+        continue;
+      }
+      $ext = strtolower($file->getExtension());
+      if (!in_array($ext, ['php', 'module', 'inc', 'theme'], TRUE)) {
+        continue;
+      }
+
+      $contents = @file_get_contents($file->getPathname());
+      if ($contents === FALSE || $contents === '') {
+        continue;
+      }
+
+      foreach ($patterns as $label => $regex) {
+        if (!preg_match_all($regex, $contents, $matches, PREG_OFFSET_CAPTURE)) {
+          continue;
+        }
+        foreach ($matches[0] as $match) {
+          [$text, $offset] = $match;
+          $line = substr_count(substr($contents, 0, $offset), "\n") + 1;
+          $rows[] = [
+            'file' => str_replace($base . '/', '', $file->getPathname()),
+            'line' => $line,
+            'pattern' => $label,
+            'excerpt' => trim(substr($text, 0, 80)),
+          ];
+        }
+      }
+    }
+
+    return new RowsOfFields($rows);
+  }
+
+  /**
+   * Surface the slowest queries logged to watchdog.
+   *
+   * Reads `watchdog` rows with type = 'system' or 'php' and looks for slow
+   * query entries. Sites using dedicated slow-log handlers (e.g. New Relic)
+   * will see nothing here.
+   *
+   * @command perf:db-slow
+   * @aliases pds
+   * @option limit
+   *   Maximum rows to return. Defaults to 10.
+   * @field-labels
+   *   timestamp: When
+   *   type: Type
+   *   message: Message
+   * @default-fields timestamp,type,message
+   *
+   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+   *   Slow query rows.
+   */
+  public function dbSlow(array $options = ['limit' => 10]): RowsOfFields {
+    $rows = [];
+    if (!$this->moduleHandler->moduleExists('dblog')) {
+      $this->logger()->warning(dt('dblog is not enabled; cannot read recent watchdog. Consider enabling slow-log at the database level instead.'));
+      return new RowsOfFields($rows);
+    }
+
+    if (!$this->database->schema()->tableExists('watchdog')) {
+      $this->logger()->warning(dt('watchdog table missing.'));
+      return new RowsOfFields($rows);
+    }
+
+    $limit = max(1, (int) $options['limit']);
+    $query = $this->database->select('watchdog', 'w')
+      ->fields('w', ['timestamp', 'type', 'message', 'variables'])
+      ->condition('severity', 5, '<=')
+      ->orderBy('timestamp', 'DESC')
+      ->range(0, $limit * 5);
+
+    $candidates = $query->execute()->fetchAll();
+    foreach ($candidates as $row) {
+      $msg = $row->message ?? '';
+      if (!preg_match('/(slow|timeout|query|sql|long.running)/i', $msg)) {
+        continue;
+      }
+      $rows[] = [
+        'timestamp' => date('Y-m-d H:i', (int) $row->timestamp),
+        'type' => $row->type,
+        'message' => mb_substr(strip_tags($msg), 0, 120),
+      ];
+      if (count($rows) >= $limit) {
+        break;
+      }
+    }
+
+    if (empty($rows)) {
+      $this->logger()->notice(dt('No slow-query patterns matched in recent watchdog entries.'));
+    }
+
+    return new RowsOfFields($rows);
+  }
+
+  /**
+   * Build the rows used by perf:cache-status and perf:audit.
+   *
+   * @return array<int, array{check: string, status: string, detail: string}>
+   *   Findings.
+   */
+  protected function collectCacheChecks(): array {
+    $perf = $this->configFactory->get('system.performance');
+    $rows = [];
+
+    $rows[] = [
+      'check' => 'Module: page_cache',
+      'status' => $this->boolStatus($this->moduleHandler->moduleExists('page_cache')),
+      'detail' => 'Anonymous internal page cache module.',
+    ];
+    $rows[] = [
+      'check' => 'Module: dynamic_page_cache',
+      'status' => $this->boolStatus($this->moduleHandler->moduleExists('dynamic_page_cache')),
+      'detail' => 'Caches authenticated requests minus auto-placeholders.',
+    ];
+    $rows[] = [
+      'check' => 'Module: big_pipe',
+      'status' => $this->boolStatus($this->moduleHandler->moduleExists('big_pipe')),
+      'detail' => 'Streams personalised placeholders after the cacheable shell.',
+    ];
+
+    $page_max = (int) $perf->get('cache.page.max_age');
+    $rows[] = [
+      'check' => 'Page max-age',
+      'status' => $page_max > 0 ? 'OK' : 'WARN',
+      'detail' => $page_max > 0
+        ? sprintf('%d seconds', $page_max)
+        : 'Anonymous page cache effectively disabled (max_age = 0).',
+    ];
+
+    return $rows;
   }
 
   /**
    * Check that Twig debug is off in production.
    */
   protected function checkTwigDebug(): array {
+    // Twig debug lives in services.yml (not config). We can introspect via
+    // the compiled twig service.
     try {
       /** @var \Twig\Environment $twig */
       $twig = \Drupal::service('twig');
@@ -158,8 +363,8 @@ final class PerfAuditCommands extends DrushCommands {
    * Check reverse_proxy setting from $settings.
    */
   protected function checkReverseProxy(): array {
-    $rp = (bool) Settings::get('reverse_proxy', FALSE);
-    $addrs = Settings::get('reverse_proxy_addresses', []);
+    $rp = (bool) \Drupal\Core\Site\Settings::get('reverse_proxy', FALSE);
+    $addrs = \Drupal\Core\Site\Settings::get('reverse_proxy_addresses', []);
     return [
       'check' => 'reverse_proxy in settings.php',
       'status' => $rp ? 'OK' : 'INFO',
@@ -170,15 +375,24 @@ final class PerfAuditCommands extends DrushCommands {
   }
 
   /**
-   * Check that a module is enabled.
+   * Check BigPipe status more verbosely.
    */
-  protected function checkModule(string $name, string $detail): array {
-    $on = $this->moduleHandler->moduleExists($name);
+  protected function checkBigPipe(): array {
+    $on = $this->moduleHandler->moduleExists('big_pipe');
     return [
-      'check' => sprintf('Module: %s', $name),
-      'status' => $on ? 'OK' : 'FAIL',
-      'detail' => $detail,
+      'check' => 'BigPipe enabled',
+      'status' => $on ? 'OK' : 'WARN',
+      'detail' => $on
+        ? 'Authenticated traffic will stream placeholders.'
+        : 'Consider enabling big_pipe for personalised UI.',
     ];
+  }
+
+  /**
+   * Render a boolean as OK / FAIL.
+   */
+  protected function boolStatus(bool $value): string {
+    return $value ? 'OK' : 'FAIL';
   }
 
 }

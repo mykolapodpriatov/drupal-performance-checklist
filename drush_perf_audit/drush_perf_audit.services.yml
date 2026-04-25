@@ -4,5 +4,6 @@ services:
     arguments:
       - '@config.factory'
       - '@module_handler'
+      - '@database'
     tags:
       - { name: drush.command }
