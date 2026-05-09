@@ -1,0 +1,99 @@
+vcl 4.1;
+
+# ------------------------------------------------------------------------------
+# Varnish 6+ VCL for Drupal 10/11.
+# Designed to work with the `purge` + `varnish_purger` modules and tag-based
+# invalidation (the Cache-Tags response header).
+# ------------------------------------------------------------------------------
+
+import std;
+
+backend default {
+    .host = "drupal-web";
+    .port = "80";
+    .first_byte_timeout = 60s;
+    .between_bytes_timeout = 60s;
+}
+
+# IPs allowed to send BAN / PURGE requests. The Drupal web container belongs
+# here; nothing else does.
+acl purgers {
+    "127.0.0.1";
+    "10.0.0.0"/8;
+}
+
+sub vcl_recv {
+    # Allow tag-based bans from the Drupal purger.
+    if (req.method == "BAN") {
+        if (!client.ip ~ purgers) {
+            return (synth(403, "Not allowed."));
+        }
+        if (req.http.Cache-Tags) {
+            ban("obj.http.Cache-Tags ~ " + req.http.Cache-Tags);
+            return (synth(200, "Banned by tag."));
+        }
+        return (synth(400, "Missing Cache-Tags header."));
+    }
+
+    # Direct PURGE on a URL.
+    if (req.method == "PURGE") {
+        if (!client.ip ~ purgers) {
+            return (synth(403, "Not allowed."));
+        }
+        return (purge);
+    }
+
+    # Don't cache authenticated traffic.
+    if (req.http.Cookie ~ "SSESS|SESS|NO_CACHE") {
+        return (pass);
+    }
+
+    # Strip noise from cookies so anonymous requests collapse to a single key.
+    if (req.http.Cookie) {
+        set req.http.Cookie = ";" + req.http.Cookie;
+        set req.http.Cookie = regsuball(req.http.Cookie, "; +", ";");
+        set req.http.Cookie = regsuball(req.http.Cookie, ";(has_js|__utm[a-z]|_ga[a-z0-9]*|_gid|cookie-agreed.*)=[^;]*", "");
+        set req.http.Cookie = regsuball(req.http.Cookie, "^;\s*", "");
+        if (req.http.Cookie ~ "^\s*$") {
+            unset req.http.Cookie;
+        }
+    }
+
+    # Don't cache admin / form pages.
+    if (req.url ~ "^/(admin|user|cart|checkout|node/add|.*/edit$)" ) {
+        return (pass);
+    }
+
+    return (hash);
+}
+
+sub vcl_backend_response {
+    # Honour Drupal's max-age. Default to 1h if backend gave us nothing useful.
+    if (beresp.ttl <= 0s) {
+        set beresp.ttl = 1h;
+    }
+
+    # Keep Cache-Tags as a header so bans match it. Strip before delivery
+    # if you don't want clients to see it.
+    if (beresp.http.Cache-Tags) {
+        set beresp.http.X-Cache-Tags = beresp.http.Cache-Tags;
+    }
+
+    # Grace mode — serve stale up to 1h while a refresh runs.
+    set beresp.grace = 1h;
+
+    return (deliver);
+}
+
+sub vcl_deliver {
+    if (obj.hits > 0) {
+        set resp.http.X-Cache = "HIT";
+    } else {
+        set resp.http.X-Cache = "MISS";
+    }
+    # Don't leak Cache-Tags to clients in production.
+    unset resp.http.Cache-Tags;
+    unset resp.http.X-Drupal-Cache-Tags;
+    unset resp.http.X-Drupal-Cache-Contexts;
+    return (deliver);
+}

@@ -1,0 +1,34 @@
+# Production services.yml override.
+# Loaded via $settings['container_yamls'][] in settings.production.php.
+
+parameters:
+  # Twig — no debug, no auto reload, cache on.
+  twig.config:
+    debug: false
+    auto_reload: false
+    cache: true
+
+  # Cacheability debug headers — useful in dev, off in prod (they leak
+  # internal cache tag names + add a few bytes per response).
+  http.response.debug_cacheability_headers: false
+
+  # Renderer — auto-place placeholders aggressively. Anything with these
+  # contexts / tags / max-age becomes a placeholder.
+  renderer.config:
+    required_cache_contexts:
+      - 'languages:language_interface'
+      - 'theme'
+      - 'user.permissions'
+    auto_placeholder_conditions:
+      max-age: 0
+      contexts:
+        - 'session'
+        - 'user'
+      tags: []
+
+  # Filter the worst session cookie noise out of the cache key.
+  session.storage.options:
+    gc_probability: 1
+    gc_divisor: 100
+    gc_maxlifetime: 200000
+    cookie_lifetime: 2000000

@@ -1,6 +1,6 @@
 # Drupal Performance Pre-Release Checklist
 
-A practical, opinionated checklist for taking a Drupal 10 / 11 site from "it works on my laptop" to "it survives Black Friday on a shared CDN".
+A practical, opinionated checklist for taking a Drupal 10 / 11 site from "it works on my laptop" to "it survives Black Friday on a shared CDN". Ships with a small Drush module that automates the boring parts of the audit.
 
 Curated and maintained against Drupal 11.x (with notes for 10.3+). PHP 8.3+ assumed.
 
@@ -18,9 +18,12 @@ Curated and maintained against Drupal 11.x (with notes for 10.3+). PHP 8.3+ assu
 6. [Image Styles and Media](#image-styles-and-media)
 7. [JS / CSS Aggregation](#js--css-aggregation)
 8. [HTTP Caching](#http-caching)
-9. [References](#references)
-
-More sections (settings.php, server config, profiling, Drush helpers) coming in follow-up commits.
+9. [Search and Indexing](#search-and-indexing)
+10. [Cron and Queues](#cron-and-queues)
+11. [Settings.php Production Checklist](#settingsphp-production-checklist)
+12. [Web Server Config](#web-server-config)
+13. [Profiling Tools](#profiling-tools)
+14. [References](#references)
 
 ---
 
@@ -36,7 +39,7 @@ Three ways:
    ddev drush perf:audit
    ```
 
-   See [`drush_perf_audit/`](./drush_perf_audit) for the module.
+   See [`drush_perf_audit/`](./drush_perf_audit) for the module and its subcommands.
 
 Markers used below:
 - ✔ = should be true in production
@@ -97,6 +100,8 @@ $build = [
   ],
 ];
 ```
+
+Run `perf:render-deprecated` to find render arrays missing `#cache`.
 
 ---
 
@@ -297,6 +302,8 @@ The cheapest cache is the one the browser already has.
 - ✔ Cache invalidation by tag (Drupal sends `Surrogate-Key` or `Cache-Tags` header; reverse proxy bans by tag).
 - ⚠ If using a CDN with no tag support (CloudFront classic), fall back to short max-age + soft purge on deploy.
 
+See [`config-examples/varnish.vcl.snippet`](./config-examples/varnish.vcl.snippet) for a working VCL.
+
 ### Tag-based purging
 
 ```php
@@ -307,6 +314,98 @@ The cheapest cache is the one the browser already has.
 ```
 
 The `purge` queue picks these up and sends them to the configured purger (Varnish, Fastly, Cloudflare, Akamai).
+
+---
+
+## Search and Indexing
+
+- ✔ Built-in core search OFF for any site bigger than ~5k nodes. It uses LIKE queries on `search_index`.
+- ✔ Search API + Solr / Elasticsearch / OpenSearch for real search.
+- ✔ Index processors enabled: HTML filter, tokenizer, stemmer, stopwords for the site language.
+- ✔ Indexing runs from cron or a dedicated worker, never on the web request.
+- ⚠ Boost: title fields and tags weighted higher than body.
+- ⚠ Faceted search uses `facets` module with hard-cap on facet item count to avoid blowing up the result page.
+
+---
+
+## Cron and Queues
+
+The web request is for rendering. Everything else goes elsewhere.
+
+- ✘ Don't run cron via Drupal's default URL-based trigger in production. It blocks a PHP-FPM worker.
+- ✔ Cron triggered via `drush cron` from system cron / k8s CronJob, every 5-15 min.
+- ✔ Heavy work modeled as Queue Workers (`@QueueWorker` plugin).
+- ✔ Queues processed by `drush queue:run <queue_name>` workers, not by `drush cron` alone.
+- ⚠ For long-running queues, use the `advancedqueue` contrib or push to an external broker (Redis Streams, RabbitMQ).
+
+```bash
+# systemd / supervisord example
+ExecStart=/var/www/html/vendor/bin/drush --root=/var/www/html/web queue:run my_module_email_queue --time-limit=55
+```
+
+---
+
+## Settings.php Production Checklist
+
+See [`config-examples/settings.production.php`](./config-examples/settings.production.php) for the full annotated example.
+
+- ✔ `$settings['hash_salt']` set from env / secret, **never** committed.
+- ✔ `$settings['trusted_host_patterns']` set to your real host(s) only.
+- ✔ `$settings['reverse_proxy'] = TRUE;` if behind Varnish/CDN.
+- ✔ `$settings['reverse_proxy_addresses']` lists trusted proxy IPs.
+- ✔ `$settings['file_temp_path'] = '/tmp/drupal-tmp';` on a non-shared, writable mount.
+- ✔ `$settings['container_yamls'][] = $app_root . '/' . $site_path . '/services.production.yml';`
+- ✔ Redis or Memcache for cache backends, configured at the very bottom of settings.php so all bins use it.
+- ✔ `config_split` activated for `prod` — settings.php sets `$config['config_split.config_split.prod']['status'] = TRUE;`.
+- ✘ `$settings['rebuild_access'] = TRUE;` must be OFF in prod.
+- ✘ `$config['system.logging']['error_level'] = 'hide';` in prod. (Use `verbose` in dev only.)
+
+### settings.local.php for dev
+
+- Loaded conditionally at the bottom of `settings.php`.
+- Enables `devel`, sets verbose error reporting, points to `services.dev.yml` with twig debug ON.
+- Never present on production filesystems.
+
+---
+
+## Web Server Config
+
+See [`config-examples/nginx.conf.snippet`](./config-examples/nginx.conf.snippet). Key bullets:
+
+- ✔ `client_max_body_size` matches the largest expected upload.
+- ✔ `fastcgi_buffers` tuned for HTML response size (default is fine for most).
+- ✔ Static asset location blocks set `expires max; access_log off;`.
+- ✔ `/sites/default/files/` allowed; PHP execution under it explicitly denied.
+- ✔ `try_files $uri /index.php?$query_string;` as the catch-all.
+- ✘ No `autoindex on` anywhere.
+
+---
+
+## Profiling Tools
+
+In order of "how much should you use it":
+
+1. **Blackfire.io** — Best for finding the actual hot path. DDEV has a one-command setup. Free tier covers most needs.
+2. **webprofiler** (in `devel`) — In-page profiler. Per-request query counts, render time, cache hit/miss. Always on in staging.
+3. **Xdebug profile mode** — Works in DDEV (`ddev xdebug on` then trigger profile). Reads with KCacheGrind / qcachegrind.
+4. **Tideways** — Production-grade APM if you can afford it.
+5. **`perf:audit`** (this repo) — sanity-check config, not a profiler.
+
+### Blackfire in DDEV
+
+```bash
+ddev get ddev/ddev-blackfire
+ddev restart
+ddev blackfire <url>
+```
+
+### Xdebug profile in DDEV
+
+```bash
+ddev xdebug on
+XDEBUG_TRIGGER=PROFILE curl https://my-site.ddev.site/
+# .cachegrind file appears in /tmp inside the web container
+```
 
 ---
 
@@ -328,7 +427,15 @@ The `purge` queue picks these up and sends them to the configured purger (Varnis
 - `search_api` + `search_api_solr`
 - `redis` (cache backend)
 - `memcache` (cache backend)
+- `image_optimize` + binary toolkits
 - `responsive_image` (core)
+- `webprofiler` (in `devel`)
+
+### Community reading
+
+- "High Performance Drupal" — O'Reilly. Old but the principles are unchanged.
+- Acquia's "Drupal Performance" knowledge base.
+- Lullabot's "Caching in Drupal 8/9/10" series.
 
 ---
 

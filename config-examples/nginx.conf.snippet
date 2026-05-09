@@ -1,0 +1,130 @@
+# ------------------------------------------------------------------------------
+# NGINX server block for Drupal 10/11.
+# Drop into /etc/nginx/sites-available/ and symlink. Tuned for PHP-FPM at
+# /var/run/php/php8.3-fpm.sock. Assumes docroot is /var/www/drupal/web.
+# ------------------------------------------------------------------------------
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name www.example.com example.com;
+
+    # Force HTTPS.
+    return 301 https://www.example.com$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name www.example.com;
+
+    root /var/www/drupal/web;
+    index index.php;
+
+    # TLS — terminate here, or trust upstream (set in reverse_proxy section).
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    # Upload size — match php.ini upload_max_filesize / post_max_size.
+    client_max_body_size 64M;
+
+    # Gzip and Brotli (Brotli requires ngx_brotli built in).
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 256;
+    gzip_proxied any;
+    gzip_vary on;
+    gzip_types
+        application/atom+xml
+        application/javascript
+        application/json
+        application/ld+json
+        application/manifest+json
+        application/rss+xml
+        application/vnd.geo+json
+        application/vnd.ms-fontobject
+        application/x-font-ttf
+        application/x-web-app-manifest+json
+        application/xhtml+xml
+        application/xml
+        font/opentype
+        image/bmp
+        image/svg+xml
+        image/x-icon
+        text/cache-manifest
+        text/css
+        text/plain
+        text/vcard
+        text/vnd.rim.location.xloc
+        text/vtt
+        text/x-component
+        text/x-cross-domain-policy;
+
+    # Long-lived caching for aggregated CSS/JS produced by core.
+    location ~* /sites/.*/files/(css|js)/ {
+        expires max;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+        try_files $uri @rewrite;
+    }
+
+    # Long-lived caching for theme/static assets.
+    location ~* \.(?:css|js|woff2?|ttf|otf|eot|svg|ico|png|jpg|jpeg|gif|webp|avif)$ {
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
+        access_log off;
+        try_files $uri @rewrite;
+    }
+
+    # Block direct PHP execution under sites/*/files (defence in depth).
+    location ~ ^/sites/[^/]+/files/.*\.php$ {
+        deny all;
+    }
+
+    # Standard Drupal rewrite.
+    location / {
+        try_files $uri /index.php?$query_string;
+    }
+
+    location @rewrite {
+        rewrite ^ /index.php;
+    }
+
+    # PHP-FPM.
+    location ~ '\.php$|^/update.php' {
+        fastcgi_split_path_info ^(.+?\.php)(|/.*)$;
+        try_files $fastcgi_script_name =404;
+
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param QUERY_STRING $query_string;
+        fastcgi_param HTTPS on;
+
+        fastcgi_intercept_errors on;
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+
+        # Increase if you see "upstream sent too big header" on big admin pages.
+        fastcgi_buffer_size 32k;
+        fastcgi_buffers 16 16k;
+
+        fastcgi_read_timeout 300;
+    }
+
+    # Deny dotfiles, backup files, vcs metadata.
+    location ~* /\.(?!well-known) {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    location ~* \.(?:engine|inc|install|module|profile|po|sh|sql|theme|tpl(?:\.php)?|xtmpl|yml)$|^(\.(?!well-known).*|Entries.*|Repository|Root|Tag|Template|composer\.(json|lock))$ {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # No autoindex anywhere.
+    autoindex off;
+}

@@ -8,14 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `perf:cache-status` subcommand reporting page-cache, dynamic-page-cache, BigPipe state and max-age.
-- `perf:render-deprecated` subcommand scanning custom modules for stale render-API patterns.
-- `perf:db-slow` subcommand surfacing slow query entries from `dblog`.
+- `config-examples/settings.production.php` annotated production settings snippet.
+- `config-examples/nginx.conf.snippet` and `varnish.vcl.snippet` reference configs.
+- `config-examples/services.production.yml` for production Twig / cacheability headers.
+- README sections: settings.php production checklist, web server config, profiling tools.
 
-## [0.2.0] - 2026-04-11
+## [0.2.0] - 2026-04-25
 
 ### Added
 - `drush_perf_audit` module providing the `perf:audit` aggregate command.
+- `perf:cache-status`, `perf:render-deprecated`, `perf:db-slow` subcommands.
 - Service registration via `drush_perf_audit.services.yml`.
 - `drush/drush ^12 || ^13` requirement in composer.json.
 
