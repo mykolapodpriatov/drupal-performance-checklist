@@ -17,6 +17,10 @@
         "drupal/core": "^10.3 || ^11",
         "drush/drush": "^12 || ^13"
     },
+    "require-dev": {
+        "drupal/coder": "^8.3",
+        "squizlabs/php_codesniffer": "^3.10"
+    },
     "autoload": {
         "psr-4": {
             "Drupal\\drush_perf_audit\\": "drush_perf_audit/src/"
@@ -24,5 +28,8 @@
     },
     "extra": {
         "installer-name": "drush_perf_audit"
+    },
+    "scripts": {
+        "phpcs": "phpcs --standard=Drupal,DrupalPractice drush_perf_audit/"
     }
 }

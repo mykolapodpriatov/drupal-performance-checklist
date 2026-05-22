@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CI workflow: yamllint, PHPCS against Drupal/DrupalPractice standards, shellcheck.
+- `CONTRIBUTING.md` with guidance for new checklist items and Drush checks.
+- `composer phpcs` script.
+
+## [0.3.0] - 2026-05-09
+
+### Added
 - `config-examples/settings.production.php` annotated production settings snippet.
 - `config-examples/nginx.conf.snippet` and `varnish.vcl.snippet` reference configs.
 - `config-examples/services.production.yml` for production Twig / cacheability headers.
@@ -29,5 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MIT license, baseline `.gitignore`, `composer.json` scaffolding.
 
 [Unreleased]: https://example.com/changelog/HEAD
+[0.3.0]: https://example.com/changelog/v0.3.0
 [0.2.0]: https://example.com/changelog/v0.2.0
 [0.1.0]: https://example.com/changelog/v0.1.0

@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-yaml:
+    name: YAML lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip install --user yamllint==1.35.1
+      - name: Run yamllint
+        run: |
+          yamllint \
+            -d "{extends: default, rules: {line-length: {max: 200}, document-start: disable, truthy: {allowed-values: ['true', 'false', 'TRUE', 'FALSE']}}}" \
+            drush_perf_audit/ \
+            config-examples/services.production.yml \
+            .github/
+
+  phpcs:
+    name: PHPCS (Drupal coding standards)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2, cs2pr
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer global require --no-progress drupal/coder:^8.3 squizlabs/php_codesniffer:^3.10
+
+      - name: Run PHPCS
+        run: |
+          ~/.composer/vendor/bin/phpcs --version
+          ~/.composer/vendor/bin/phpcs \
+            --standard=Drupal,DrupalPractice \
+            --extensions=php,module,inc,install,test,profile,theme,info \
+            --report=full \
+            drush_perf_audit/
+
+  shellcheck:
+    name: Shellcheck (if any scripts present)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on shell scripts
+        run: |
+          set -e
+          shopt -s globstar nullglob
+          scripts=( **/*.sh )
+          if [ ${#scripts[@]} -eq 0 ]; then
+            echo "No .sh scripts found; skipping."
+            exit 0
+          fi
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+          shellcheck "${scripts[@]}"
