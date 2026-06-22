@@ -8,6 +8,7 @@ use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Site\Settings;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
 
@@ -41,7 +42,7 @@ final class PerfAuditCommands extends DrushCommands {
   public function __construct(
     ConfigFactoryInterface $config_factory,
     ModuleHandlerInterface $module_handler,
-    Connection $database
+    Connection $database,
   ) {
     parent::__construct();
     $this->configFactory = $config_factory;
@@ -355,8 +356,8 @@ final class PerfAuditCommands extends DrushCommands {
    * Check reverse_proxy setting from $settings.
    */
   protected function checkReverseProxy(): array {
-    $rp = (bool) \Drupal\Core\Site\Settings::get('reverse_proxy', FALSE);
-    $addrs = \Drupal\Core\Site\Settings::get('reverse_proxy_addresses', []);
+    $rp = (bool) Settings::get('reverse_proxy', FALSE);
+    $addrs = Settings::get('reverse_proxy_addresses', []);
     return [
       'check' => 'reverse_proxy in settings.php',
       'status' => $rp ? 'OK' : 'INFO',
