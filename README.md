@@ -101,7 +101,7 @@ $build = [
 ];
 ```
 
-Run `perf:render-deprecated` to find render arrays missing `#cache`.
+Run `perf:render-deprecated` for a best-effort grep for deprecated render-API antipatterns.
 
 ---
 
