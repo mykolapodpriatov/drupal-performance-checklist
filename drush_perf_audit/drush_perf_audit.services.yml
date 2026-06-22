@@ -6,4 +6,4 @@ services:
       - '@module_handler'
       - '@database'
     tags:
-      - { name: drush.command }
+      - name: drush.command
