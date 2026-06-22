@@ -285,6 +285,9 @@ final class PerfAuditCommands extends DrushCommands {
     // the compiled twig service.
     try {
       /** @var \Twig\Environment $twig */
+      // The compiled twig service is runtime-only and not portably injectable
+      // into a standalone Drush command; the call is guarded by try/catch.
+      // phpcs:ignore DrupalPractice.Objects.GlobalDrupal.GlobalDrupal
       $twig = \Drupal::service('twig');
       $debug = $twig->isDebug();
     }
