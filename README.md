@@ -1,5 +1,7 @@
 # Drupal Performance Pre-Release Checklist
 
+[![CI](https://github.com/mykolapodpriatov/drupal-performance-checklist/actions/workflows/ci.yml/badge.svg)](https://github.com/mykolapodpriatov/drupal-performance-checklist/actions/workflows/ci.yml)
+
 A practical, opinionated checklist for taking a Drupal 10 / 11 site from "it works on my laptop" to "it survives Black Friday on a shared CDN". Ships with a small Drush module that automates the boring parts of the audit.
 
 Curated and maintained against Drupal 11.x (with notes for 10.3+). PHP 8.3+ assumed.
