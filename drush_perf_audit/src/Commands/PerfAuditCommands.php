@@ -8,6 +8,7 @@ use Consolidation\OutputFormatters\StructuredData\RowsOfFields;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
 
 /**
@@ -54,22 +55,18 @@ final class PerfAuditCommands extends DrushCommands {
    * Aggregates checks from cache-status and inspects a handful of generic
    * production settings. Prints a single table of findings.
    *
-   * @command perf:audit
-   * @aliases pa
-   * @field-labels
-   *   check: Check
-   *   status: Status
-   *   detail: Detail
-   * @default-fields check,status,detail
-   *
-   * @usage drush perf:audit
-   *   Run all checks.
-   *
-   * @filter-default-field check
-   *
    * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
    *   Findings as a table.
    */
+  #[CLI\Command(name: 'perf:audit', aliases: ['pa'])]
+  #[CLI\FieldLabels(labels: [
+    'check' => 'Check',
+    'status' => 'Status',
+    'detail' => 'Detail',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['check', 'status', 'detail'])]
+  #[CLI\FilterDefaultField(field: 'check')]
+  #[CLI\Usage(name: 'drush perf:audit', description: 'Run all checks.')]
   public function audit(): RowsOfFields {
     $rows = [];
 
@@ -91,17 +88,16 @@ final class PerfAuditCommands extends DrushCommands {
   /**
    * Report the status of Drupal's page-caching modules and max-age.
    *
-   * @command perf:cache-status
-   * @aliases pcs
-   * @field-labels
-   *   check: Check
-   *   status: Status
-   *   detail: Detail
-   * @default-fields check,status,detail
-   *
    * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
    *   Findings as a table.
    */
+  #[CLI\Command(name: 'perf:cache-status', aliases: ['pcs'])]
+  #[CLI\FieldLabels(labels: [
+    'check' => 'Check',
+    'status' => 'Status',
+    'detail' => 'Detail',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['check', 'status', 'detail'])]
   public function cacheStatus(): RowsOfFields {
     return new RowsOfFields($this->collectCacheChecks());
   }
@@ -113,20 +109,18 @@ final class PerfAuditCommands extends DrushCommands {
    * antipatterns. False positives are expected on copy-pasted vendor code;
    * the report is intended as a starting point, not a verdict.
    *
-   * @command perf:render-deprecated
-   * @aliases prd
-   * @option path
-   *   Override the directory scanned. Defaults to modules/custom.
-   * @field-labels
-   *   file: File
-   *   line: Line
-   *   pattern: Pattern
-   *   excerpt: Excerpt
-   * @default-fields file,line,pattern,excerpt
-   *
    * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
    *   Matches as a table.
    */
+  #[CLI\Command(name: 'perf:render-deprecated', aliases: ['prd'])]
+  #[CLI\Option(name: 'path', description: 'Override the directory scanned. Defaults to modules/custom.')]
+  #[CLI\FieldLabels(labels: [
+    'file' => 'File',
+    'line' => 'Line',
+    'pattern' => 'Pattern',
+    'excerpt' => 'Excerpt',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['file', 'line', 'pattern', 'excerpt'])]
   public function renderDeprecated(array $options = ['path' => NULL]): RowsOfFields {
     $base = DRUPAL_ROOT;
     $relative = $options['path'] ?? 'modules/custom';
@@ -191,19 +185,17 @@ final class PerfAuditCommands extends DrushCommands {
    * query entries. Sites using dedicated slow-log handlers (e.g. New Relic)
    * will see nothing here.
    *
-   * @command perf:db-slow
-   * @aliases pds
-   * @option limit
-   *   Maximum rows to return. Defaults to 10.
-   * @field-labels
-   *   timestamp: When
-   *   type: Type
-   *   message: Message
-   * @default-fields timestamp,type,message
-   *
    * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
    *   Slow query rows.
    */
+  #[CLI\Command(name: 'perf:db-slow', aliases: ['pds'])]
+  #[CLI\Option(name: 'limit', description: 'Maximum rows to return. Defaults to 10.')]
+  #[CLI\FieldLabels(labels: [
+    'timestamp' => 'When',
+    'type' => 'Type',
+    'message' => 'Message',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['timestamp', 'type', 'message'])]
   public function dbSlow(array $options = ['limit' => 10]): RowsOfFields {
     $rows = [];
     if (!$this->moduleHandler->moduleExists('dblog')) {
