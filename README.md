@@ -360,7 +360,7 @@ See [`config-examples/settings.production.php`](./config-examples/settings.produ
 - ✔ Redis or Memcache for cache backends, configured at the very bottom of settings.php so all bins use it.
 - ✔ `config_split` activated for `prod` — settings.php sets `$config['config_split.config_split.prod']['status'] = TRUE;`.
 - ✘ `$settings['rebuild_access'] = TRUE;` must be OFF in prod.
-- ✘ `$config['system.logging']['error_level'] = 'hide';` in prod. (Use `verbose` in dev only.)
+- ✔ `$config['system.logging']['error_level'] = 'hide';` in prod. (Use `verbose` in dev only.)
 
 ### settings.local.php for dev
 
