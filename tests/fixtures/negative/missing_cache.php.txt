@@ -1,0 +1,32 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a block build() that declares #cache before returning.
+ *
+ * The #cache keyword appears before the return, so the tempered pattern
+ * stops short; the block also returns a variable rather than an inline
+ * "return [" literal. Either reason keeps it out of the report.
+ */
+
+namespace Drupal\my_module\Plugin\Block;
+
+use Drupal\Core\Cache\Cache;
+
+/**
+ * A well-behaved block with explicit cache metadata.
+ */
+class CachedBlock {
+
+  public function build() {
+    $build = [
+      '#markup' => 'Hello',
+    ];
+    $build['#cache'] = [
+      'max-age' => Cache::PERMANENT,
+      'contexts' => ['user.permissions'],
+    ];
+    return $build;
+  }
+
+}

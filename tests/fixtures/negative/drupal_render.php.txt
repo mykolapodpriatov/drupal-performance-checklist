@@ -1,0 +1,14 @@
+<?php
+
+/**
+ * @file
+ * Fixture: modern renderer usage that must NOT be flagged.
+ *
+ * Note: a helper named my_drupal_render_helper() would not match either,
+ * because \bdrupal_render requires a word boundary before "drupal_render".
+ */
+
+function my_module_preprocess_block(array &$variables): void {
+  $build = ['#markup' => 'hi'];
+  $variables['rendered'] = \Drupal::service('renderer')->renderInIsolation($build);
+}

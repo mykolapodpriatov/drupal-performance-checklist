@@ -1,0 +1,14 @@
+<?php
+
+/**
+ * @file
+ * Fixture: rendering an unrelated variable must NOT be flagged.
+ *
+ * The pattern only targets render($build); rendering some other element is
+ * not what this grep is looking for.
+ */
+
+function my_module_preprocess_node(array &$variables): void {
+  $element = $variables['content'];
+  $variables['content_html'] = \Drupal::service('renderer')->render($element);
+}

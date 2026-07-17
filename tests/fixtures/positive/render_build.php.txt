@@ -1,0 +1,12 @@
+<?php
+
+/**
+ * @file
+ * Fixture: rendering $build during preprocess MUST be flagged.
+ */
+
+function my_module_preprocess_node(array &$variables): void {
+  $build = $variables['content'];
+  // Rendering inside preprocess loses bubbled cacheability metadata.
+  $variables['content_html'] = \Drupal::service('renderer')->render($build);
+}

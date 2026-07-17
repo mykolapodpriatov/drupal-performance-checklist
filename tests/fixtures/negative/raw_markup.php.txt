@@ -1,0 +1,14 @@
+<?php
+
+/**
+ * @file
+ * Fixture: #markup wrapped in Markup::create() must NOT be flagged.
+ */
+
+use Drupal\Core\Render\Markup;
+
+function my_module_build(string $body): array {
+  return [
+    '#markup' => Markup::create($body),
+  ];
+}

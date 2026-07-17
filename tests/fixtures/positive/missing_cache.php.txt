@@ -1,0 +1,21 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a block build() returning an inline array without #cache.
+ */
+
+namespace Drupal\my_module\Plugin\Block;
+
+/**
+ * A block that returns uncacheable inline markup.
+ */
+class UncachedBlock {
+
+  public function build() {
+    return [
+      '#markup' => 'Current time: ' . time(),
+    ];
+  }
+
+}
