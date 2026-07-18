@@ -1,0 +1,10 @@
+<?php
+
+/**
+ * @file
+ * Fixture: error_level set to hide must NOT be flagged.
+ *
+ * Only 'verbose' and 'all' are antipatterns; 'hide' is the production value.
+ */
+
+$config['system.logging']['error_level'] = 'hide';

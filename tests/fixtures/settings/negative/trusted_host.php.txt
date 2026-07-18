@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a settings file that sets trusted_host_patterns must NOT be flagged.
+ *
+ * The required assignment is present, so the missing-line check stays silent.
+ */
+
+$settings['trusted_host_patterns'] = [
+  '^www\.example\.com$',
+  '^example\.com$',
+];

@@ -1,0 +1,10 @@
+<?php
+
+/**
+ * @file
+ * Fixture: verbose error_level in settings.php MUST be flagged.
+ *
+ * Verbose errors leak stack traces to end users; production should be "hide".
+ */
+
+$config['system.logging']['error_level'] = 'verbose';

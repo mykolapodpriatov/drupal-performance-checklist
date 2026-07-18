@@ -1,0 +1,11 @@
+<?php
+
+/**
+ * @file
+ * Fixture: hash_salt read from the environment must NOT be flagged.
+ *
+ * The value comes from getenv() with an empty-string fallback, so there is no
+ * quoted literal immediately after the assignment.
+ */
+
+$settings['hash_salt'] = getenv('DRUPAL_HASH_SALT') ?: '';

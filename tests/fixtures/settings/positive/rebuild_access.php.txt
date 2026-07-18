@@ -1,0 +1,11 @@
+<?php
+
+/**
+ * @file
+ * Fixture: rebuild_access left ON in settings.php MUST be flagged.
+ *
+ * rebuild_access exposes rebuild.php without a token; it must be FALSE in
+ * production.
+ */
+
+$settings['rebuild_access'] = TRUE;

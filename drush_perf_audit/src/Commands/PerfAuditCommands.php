@@ -10,6 +10,7 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Site\Settings;
 use Drupal\drush_perf_audit\RenderPatterns;
+use Drupal\drush_perf_audit\SettingsPatterns;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
 
@@ -170,6 +171,82 @@ final class PerfAuditCommands extends DrushCommands {
           ];
         }
       }
+    }
+
+    return new RowsOfFields($rows);
+  }
+
+  /**
+   * Grep a settings.php file for production-hardening antipatterns.
+   *
+   * Reads a single settings file as text (never executing it) and applies the
+   * SettingsPatterns catalogue: flags whose PRESENCE is a problem
+   * (rebuild_access, verbose error_level, a hard-coded hash_salt) and lines
+   * whose ABSENCE is a problem (trusted_host_patterns). It is a static lint,
+   * not a runtime inspection, so it works against any checked-out settings
+   * file without bootstrapping the site it configures.
+   *
+   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+   *   Findings as a table.
+   */
+  #[CLI\Command(name: 'perf:settings-audit', aliases: ['psa'])]
+  #[CLI\Option(name: 'file', description: 'Override the settings file scanned. Defaults to sites/default/settings.php.')]
+  #[CLI\FieldLabels(labels: [
+    'check' => 'Check',
+    'line' => 'Line',
+    'excerpt' => 'Excerpt',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['check', 'line', 'excerpt'])]
+  #[CLI\Usage(name: 'drush perf:settings-audit --file=sites/default/settings.php', description: 'Lint a settings file.')]
+  public function settingsAudit(array $options = ['file' => NULL]): RowsOfFields {
+    $relative = $options['file'] ?? 'sites/default/settings.php';
+    $file = $relative;
+    if (!is_file($file) && defined('DRUPAL_ROOT')) {
+      $file = rtrim(DRUPAL_ROOT, '/') . '/' . ltrim($relative, '/');
+    }
+
+    $rows = [];
+    if (!is_file($file)) {
+      $this->logger()->warning(dt('Settings file @f not found, skipping.', ['@f' => $file]));
+      return new RowsOfFields($rows);
+    }
+
+    $contents = @file_get_contents($file);
+    if ($contents === FALSE || $contents === '') {
+      $this->logger()->warning(dt('Settings file @f is empty or unreadable.', ['@f' => $file]));
+      return new RowsOfFields($rows);
+    }
+
+    // Antipatterns: a match is a finding, reported with its line number.
+    foreach (SettingsPatterns::PATTERNS as $label => $regex) {
+      if (!preg_match_all($regex, $contents, $matches, PREG_OFFSET_CAPTURE)) {
+        continue;
+      }
+      foreach ($matches[0] as $match) {
+        [$text, $offset] = $match;
+        $line = substr_count(substr($contents, 0, $offset), "\n") + 1;
+        $rows[] = [
+          'check' => $label,
+          'line' => $line,
+          'excerpt' => trim(substr($text, 0, 80)),
+        ];
+      }
+    }
+
+    // Required lines: the ABSENCE of a match is a finding.
+    foreach (SettingsPatterns::REQUIRED as $label => $regex) {
+      if (preg_match($regex, $contents) === 1) {
+        continue;
+      }
+      $rows[] = [
+        'check' => $label,
+        'line' => '-',
+        'excerpt' => 'Required hardening line not found.',
+      ];
+    }
+
+    if (empty($rows)) {
+      $this->logger()->notice(dt('No settings antipatterns matched in @f.', ['@f' => $file]));
     }
 
     return new RowsOfFields($rows);
