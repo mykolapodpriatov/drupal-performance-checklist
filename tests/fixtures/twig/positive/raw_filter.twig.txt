@@ -1,0 +1,6 @@
+{#
+  Fixture: the |raw filter disables autoescaping and MUST be flagged.
+#}
+<article class="node">
+  <div class="body">{{ content.body|raw }}</div>
+</article>

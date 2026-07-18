@@ -1,0 +1,11 @@
+{#
+  Fixture: autoescaped output must NOT be flagged.
+
+  A filter whose name merely starts with "raw" (e.g. |rawify) is not matched
+  either, thanks to the trailing word boundary.
+#}
+<article class="node">
+  <h2>{{ node.title.value }}</h2>
+  <div class="body">{{ content.body }}</div>
+  <span>{{ label|rawify }}</span>
+</article>

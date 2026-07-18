@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `perf:settings-audit` Drush command (with `--file`) that greps a settings.php
   file for production-hardening antipatterns, backed by a dependency-free
   `SettingsPatterns` value object and positive/negative fixture unit tests.
+- `perf:twig-audit` Drush command (with `--path`) that scans `*.html.twig`
+  templates for `|raw` filters and inline `<script>`/`<style>` blocks, backed
+  by a dependency-free `TwigPatterns` value object and fixture unit tests.
 
 ## [0.4.0] - 2026-06-22
 
