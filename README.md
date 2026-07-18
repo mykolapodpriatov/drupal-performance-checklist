@@ -168,6 +168,8 @@ The single most common reason a Drupal site is slow in production: render arrays
 
 ### Twig
 
+For local dev use the inverse — see [`config-examples/services.dev.yml`](./config-examples/services.dev.yml) (`debug: true`, `auto_reload: true`, `cache: false`).
+
 - ✔ `twig.config.debug: false` in `services.yml` for prod.
 - ✔ `twig.config.auto_reload: false` for prod.
 - ✔ `twig.config.cache: true` for prod.
@@ -441,8 +443,10 @@ See [`config-examples/settings.production.php`](./config-examples/settings.produ
 
 ### settings.local.php for dev
 
+See [`config-examples/settings.local.php`](./config-examples/settings.local.php) and [`config-examples/services.dev.yml`](./config-examples/services.dev.yml) for the annotated dev examples.
+
 - Loaded conditionally at the bottom of `settings.php`.
-- Enables `devel`, sets verbose error reporting, points to `services.dev.yml` with twig debug ON.
+- Enables `devel`, sets verbose error reporting, disables render/page caching, and points to `services.dev.yml` with twig debug ON.
 - Never present on production filesystems.
 
 ---

@@ -1,0 +1,17 @@
+# Development services.yml override.
+# Loaded via $settings['container_yamls'][] in settings.local.php.
+# This is the dev counterpart of services.production.yml — never ship it to
+# production, where it would leak template paths and disable the Twig cache.
+
+parameters:
+  # Twig — debug on so {{ dump() }} and template suggestions work, auto_reload
+  # so template edits show up without a cache rebuild, cache off so nothing is
+  # compiled to disk.
+  twig.config:
+    debug: true
+    auto_reload: true
+    cache: false
+
+  # Cacheability debug headers — expose X-Drupal-Cache-Tags / -Contexts /
+  # -Max-Age so you can see why (or why not) a response was cached.
+  http.response.debug_cacheability_headers: true

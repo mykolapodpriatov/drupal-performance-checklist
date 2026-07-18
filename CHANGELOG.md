@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `perf:twig-audit` Drush command (with `--path`) that scans `*.html.twig`
   templates for `|raw` filters and inline `<script>`/`<style>` blocks, backed
   by a dependency-free `TwigPatterns` value object and fixture unit tests.
+- `config-examples/settings.local.php` and `config-examples/services.dev.yml`
+  annotated development config examples (verbose errors, devel, disabled
+  render/page cache, Twig debug), linked from the README and yamllint in CI.
 
 ## [0.4.0] - 2026-06-22
 

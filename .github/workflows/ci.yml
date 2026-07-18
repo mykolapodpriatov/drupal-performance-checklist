@@ -23,6 +23,7 @@ jobs:
             -d "{extends: default, rules: {line-length: {max: 200}, document-start: disable, truthy: {allowed-values: ['true', 'false', 'TRUE', 'FALSE']}}}" \
             drush_perf_audit/ \
             config-examples/services.production.yml \
+            config-examples/services.dev.yml \
             .github/
 
   phpcs:
