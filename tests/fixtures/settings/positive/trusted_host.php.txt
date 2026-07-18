@@ -1,0 +1,13 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a settings file MISSING trusted_host_patterns MUST be flagged.
+ *
+ * The setting is only mentioned in a comment, never assigned, so Drupal would
+ * accept any Host header. A bare mention must not satisfy the required check.
+ */
+
+// TODO: set trusted_host_patterns to the real host(s) before going live.
+$settings['hash_salt'] = getenv('DRUPAL_HASH_SALT') ?: '';
+$config['system.logging']['error_level'] = 'hide';

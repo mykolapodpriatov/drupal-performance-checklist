@@ -1,0 +1,9 @@
+{#
+  Fixture: an inline <script> block MUST be flagged.
+#}
+<div class="widget">
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    console.log('inline JS in a template');
+  </script>
+</div>

@@ -1,0 +1,8 @@
+{#
+  Fixture: an inline <style> block MUST be flagged.
+#}
+<div class="hero">
+  <style>
+    .hero { background: #fff; padding: 2rem; }
+  </style>
+</div>

@@ -10,6 +10,8 @@ use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Site\Settings;
 use Drupal\drush_perf_audit\RenderPatterns;
+use Drupal\drush_perf_audit\SettingsPatterns;
+use Drupal\drush_perf_audit\TwigPatterns;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
 
@@ -147,6 +149,152 @@ final class PerfAuditCommands extends DrushCommands {
       }
       $ext = strtolower($file->getExtension());
       if (!in_array($ext, ['php', 'module', 'inc', 'theme'], TRUE)) {
+        continue;
+      }
+
+      $contents = @file_get_contents($file->getPathname());
+      if ($contents === FALSE || $contents === '') {
+        continue;
+      }
+
+      foreach ($patterns as $label => $regex) {
+        if (!preg_match_all($regex, $contents, $matches, PREG_OFFSET_CAPTURE)) {
+          continue;
+        }
+        foreach ($matches[0] as $match) {
+          [$text, $offset] = $match;
+          $line = substr_count(substr($contents, 0, $offset), "\n") + 1;
+          $rows[] = [
+            'file' => str_replace($base . '/', '', $file->getPathname()),
+            'line' => $line,
+            'pattern' => $label,
+            'excerpt' => trim(substr($text, 0, 80)),
+          ];
+        }
+      }
+    }
+
+    return new RowsOfFields($rows);
+  }
+
+  /**
+   * Grep a settings.php file for production-hardening antipatterns.
+   *
+   * Reads a single settings file as text (never executing it) and applies the
+   * SettingsPatterns catalogue: flags whose PRESENCE is a problem
+   * (rebuild_access, verbose error_level, a hard-coded hash_salt) and lines
+   * whose ABSENCE is a problem (trusted_host_patterns). It is a static lint,
+   * not a runtime inspection, so it works against any checked-out settings
+   * file without bootstrapping the site it configures.
+   *
+   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+   *   Findings as a table.
+   */
+  #[CLI\Command(name: 'perf:settings-audit', aliases: ['psa'])]
+  #[CLI\Option(name: 'file', description: 'Override the settings file scanned. Defaults to sites/default/settings.php.')]
+  #[CLI\FieldLabels(labels: [
+    'check' => 'Check',
+    'line' => 'Line',
+    'excerpt' => 'Excerpt',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['check', 'line', 'excerpt'])]
+  #[CLI\Usage(name: 'drush perf:settings-audit --file=sites/default/settings.php', description: 'Lint a settings file.')]
+  public function settingsAudit(array $options = ['file' => NULL]): RowsOfFields {
+    $relative = $options['file'] ?? 'sites/default/settings.php';
+    $file = $relative;
+    if (!is_file($file) && defined('DRUPAL_ROOT')) {
+      $file = rtrim(DRUPAL_ROOT, '/') . '/' . ltrim($relative, '/');
+    }
+
+    $rows = [];
+    if (!is_file($file)) {
+      $this->logger()->warning(dt('Settings file @f not found, skipping.', ['@f' => $file]));
+      return new RowsOfFields($rows);
+    }
+
+    $contents = @file_get_contents($file);
+    if ($contents === FALSE || $contents === '') {
+      $this->logger()->warning(dt('Settings file @f is empty or unreadable.', ['@f' => $file]));
+      return new RowsOfFields($rows);
+    }
+
+    // Antipatterns: a match is a finding, reported with its line number.
+    foreach (SettingsPatterns::PATTERNS as $label => $regex) {
+      if (!preg_match_all($regex, $contents, $matches, PREG_OFFSET_CAPTURE)) {
+        continue;
+      }
+      foreach ($matches[0] as $match) {
+        [$text, $offset] = $match;
+        $line = substr_count(substr($contents, 0, $offset), "\n") + 1;
+        $rows[] = [
+          'check' => $label,
+          'line' => $line,
+          'excerpt' => trim(substr($text, 0, 80)),
+        ];
+      }
+    }
+
+    // Required lines: the ABSENCE of a match is a finding.
+    foreach (SettingsPatterns::REQUIRED as $label => $regex) {
+      if (preg_match($regex, $contents) === 1) {
+        continue;
+      }
+      $rows[] = [
+        'check' => $label,
+        'line' => '-',
+        'excerpt' => 'Required hardening line not found.',
+      ];
+    }
+
+    if (empty($rows)) {
+      $this->logger()->notice(dt('No settings antipatterns matched in @f.', ['@f' => $file]));
+    }
+
+    return new RowsOfFields($rows);
+  }
+
+  /**
+   * Scan Twig templates for perf/security antipatterns.
+   *
+   * Walks a template directory and grep-matches the TwigPatterns catalogue
+   * (`|raw` filters, inline `<script>` and `<style>` blocks) against every
+   * *.html.twig file. Like perf:render-deprecated it is a heuristic lint:
+   * false positives are possible on intentionally-raw markup, so the report is
+   * a starting point, not a verdict.
+   *
+   * @return \Consolidation\OutputFormatters\StructuredData\RowsOfFields
+   *   Matches as a table.
+   */
+  #[CLI\Command(name: 'perf:twig-audit', aliases: ['pta'])]
+  #[CLI\Option(name: 'path', description: 'Override the directory scanned. Defaults to themes/custom.')]
+  #[CLI\FieldLabels(labels: [
+    'file' => 'File',
+    'line' => 'Line',
+    'pattern' => 'Pattern',
+    'excerpt' => 'Excerpt',
+  ])]
+  #[CLI\DefaultTableFields(fields: ['file', 'line', 'pattern', 'excerpt'])]
+  #[CLI\Usage(name: 'drush perf:twig-audit --path=themes/custom', description: 'Scan custom theme templates.')]
+  public function twigAudit(array $options = ['path' => NULL]): RowsOfFields {
+    $base = DRUPAL_ROOT;
+    $relative = $options['path'] ?? 'themes/custom';
+    $root = rtrim($base, '/') . '/' . ltrim($relative, '/');
+
+    $rows = [];
+    if (!is_dir($root)) {
+      $this->logger()->warning(dt('Scan path @p not found, skipping.', ['@p' => $root]));
+      return new RowsOfFields($rows);
+    }
+
+    $patterns = TwigPatterns::PATTERNS;
+
+    $iterator = new \RecursiveIteratorIterator(
+      new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+    );
+
+    foreach ($iterator as $file) {
+      /** @var \SplFileInfo $file */
+      if (!$file->isFile() || !str_ends_with($file->getFilename(), '.html.twig')) {
         continue;
       }
 

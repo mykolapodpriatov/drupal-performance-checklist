@@ -1,0 +1,10 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a hard-coded hash_salt literal MUST be flagged.
+ *
+ * Committing the real salt to version control defeats its purpose.
+ */
+
+$settings['hash_salt'] = 'Zx8kQ2p_hardcoded_salt_do_not_commit';

@@ -1,0 +1,9 @@
+{#
+  Fixture: a style attribute (not a style block) must NOT be flagged.
+
+  Inline style attributes are a separate concern; the pattern only targets
+  render-blocking style blocks embedded in a template.
+#}
+<div class="hero" style="padding: 2rem">
+  <link rel="stylesheet" href="{{ base_path }}themes/custom/example/css/hero.css">
+</div>

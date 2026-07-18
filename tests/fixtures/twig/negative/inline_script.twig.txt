@@ -1,0 +1,9 @@
+{#
+  Fixture: an external script (with a src attribute) must NOT be flagged.
+
+  Attaching JS via a library or a src-referenced file is the correct pattern;
+  only inline script blocks are the target.
+#}
+<div class="widget">
+  <script src="{{ base_path }}themes/custom/example/js/widget.js" defer></script>
+</div>

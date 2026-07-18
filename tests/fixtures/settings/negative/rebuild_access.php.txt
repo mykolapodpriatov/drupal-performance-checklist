@@ -1,0 +1,12 @@
+<?php
+
+/**
+ * @file
+ * Fixture: rebuild_access disabled must NOT be flagged.
+ *
+ * The comment mentions rebuild_access but only the FALSE assignment is real,
+ * and the pattern requires "= TRUE".
+ */
+
+// rebuild_access — MUST be off in production.
+$settings['rebuild_access'] = FALSE;
