@@ -1,0 +1,12 @@
+<?php
+
+/**
+ * @file
+ * Fixture: legacy drupal_render() usage that MUST be flagged.
+ */
+
+function my_module_preprocess_block(array &$variables): void {
+  $build = ['#markup' => 'hi'];
+  // drupal_render() was removed in Drupal 9; this is the antipattern.
+  $variables['rendered'] = drupal_render($build);
+}

@@ -1,0 +1,12 @@
+<?php
+
+/**
+ * @file
+ * Fixture: an unsanitised variable assigned to #markup MUST be flagged.
+ */
+
+function my_module_build(string $body): array {
+  return [
+    '#markup' => $body,
+  ];
+}

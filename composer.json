@@ -25,6 +25,7 @@
     },
     "require-dev": {
         "drupal/coder": "^8.3",
+        "phpunit/phpunit": "^10.5 || ^11",
         "squizlabs/php_codesniffer": "^3.10"
     },
     "autoload": {
@@ -32,10 +33,23 @@
             "Drupal\\drush_perf_audit\\": "drush_perf_audit/src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Drupal\\Tests\\drush_perf_audit\\": "tests/src/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "drupal/core-composer-scaffold": false,
+            "symfony/runtime": false
+        }
+    },
     "extra": {
         "installer-name": "drush_perf_audit"
     },
     "scripts": {
-        "phpcs": "phpcs --standard=Drupal,DrupalPractice drush_perf_audit/"
+        "phpcs": "phpcs --standard=Drupal,DrupalPractice drush_perf_audit/",
+        "test": "phpunit"
     }
 }

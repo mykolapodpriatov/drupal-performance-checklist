@@ -19,13 +19,14 @@ Curated and maintained against Drupal 11.x (with notes for 10.3+). PHP 8.3+ assu
 5. [Database](#database)
 6. [Image Styles and Media](#image-styles-and-media)
 7. [JS / CSS Aggregation](#js--css-aggregation)
-8. [HTTP Caching](#http-caching)
-9. [Search and Indexing](#search-and-indexing)
-10. [Cron and Queues](#cron-and-queues)
-11. [Settings.php Production Checklist](#settingsphp-production-checklist)
-12. [Web Server Config](#web-server-config)
-13. [Profiling Tools](#profiling-tools)
-14. [References](#references)
+8. [Frontend Performance and Core Web Vitals](#frontend-performance-and-core-web-vitals)
+9. [HTTP Caching](#http-caching)
+10. [Search and Indexing](#search-and-indexing)
+11. [Cron and Queues](#cron-and-queues)
+12. [Settings.php Production Checklist](#settingsphp-production-checklist)
+13. [Web Server Config](#web-server-config)
+14. [Profiling Tools](#profiling-tools)
+15. [References](#references)
 
 ---
 
@@ -287,6 +288,82 @@ $attachments['#attached']['html_head_link'][] = [
 
 ---
 
+## Frontend Performance and Core Web Vitals
+
+A perfect server-side cache hit gives you a fast TTFB. Core Web Vitals — LCP, CLS, INP — are what the *user* actually feels, and they are measured in the browser. Drupal's markup and asset decisions drive every one of them, so this section is where a "green in the profiler, red in the field" site gets fixed.
+
+### Largest Contentful Paint (LCP) and the hero image
+
+The LCP element is almost always the hero image or the headline above the fold. The biggest win is telling the browser which image matters *first*.
+
+- ✔ The LCP hero image carries `fetchpriority="high"` so the browser fetches it ahead of lower-priority assets.
+- ✘ Never let `loading="lazy"` land on the LCP image. Drupal image fields emit `loading="lazy"` by default (9.1+); on the hero that is a *regression* — the browser defers the single most important byte of the page.
+- ✔ Preload the hero when its URL is known at build time (`<link rel="preload" as="image">`, with `imagesrcset` for responsive sources).
+- ⚠ A `srcset` / `<picture>` hero needs `imagesrcset` + `imagesizes` on the preload link, or the browser preloads the wrong candidate and downloads the image twice.
+
+Flip the field defaults for the hero only — don't disable lazy-loading site-wide:
+
+```php
+// my_theme.theme — mark the hero image field as high priority, not lazy.
+function my_theme_preprocess_field(array &$variables): void {
+  if ($variables['field_name'] === 'field_hero_image') {
+    foreach ($variables['items'] as &$item) {
+      $item['content']['#item_attributes']['fetchpriority'] = 'high';
+      $item['content']['#item_attributes']['loading'] = 'eager';
+    }
+  }
+}
+```
+
+### Cumulative Layout Shift (CLS)
+
+Layout shift is overwhelmingly caused by images and embeds that arrive without reserved space.
+
+- ✔ Every `<img>` renders explicit `width` and `height` attributes so the browser reserves the aspect-ratio box before the bytes arrive. Drupal image fields emit these from the source dimensions — verify custom templates and image styles don't strip them.
+- ✘ Don't set `height: auto` in CSS *without* keeping the HTML `width`/`height` attributes — those attributes are what feed the browser's `aspect-ratio` reservation.
+- ⚠ Ad slots, `oembed` video iframes, and lazy-loaded blocks need a min-height / aspect-ratio box reserved in CSS, or they shove content down when they hydrate.
+- ⚠ Web fonts only cause zero layout shift when the fallback is metric-matched (`size-adjust`, `ascent-override`) to the real font.
+
+### Interaction to Next Paint (INP)
+
+INP replaced FID as a Core Web Vital in 2024. It reports the site's *slowest* interaction, so one heavy handler tanks the score.
+
+- ✘ Don't attach expensive work directly inside a Drupal behavior's `attach()` — behaviors re-run on every `Drupal.attachBehaviors()` call (every AJAX response, every BigPipe placeholder).
+- ✔ Guard behaviors with `once()` so each element is bound a single time:
+
+```javascript
+Drupal.behaviors.myWidget = {
+  attach(context) {
+    once('my-widget', '.my-widget', context).forEach((el) => {
+      // Bind once; keep the handler light and defer the heavy work.
+      el.addEventListener('click', () => requestIdleCallback(doExpensiveThing));
+    });
+  },
+};
+```
+
+- ✔ Break long tasks (>50 ms) with `requestIdleCallback` / `scheduler.yield()` so the main thread can paint between chunks.
+- ⚠ `views_infinite_scroll` and AJAX pagers re-run all behaviors over the whole page; scope to `context` and use `once()` to avoid O(n²) rebinding.
+
+### Font loading
+
+- ✔ `font-display: swap` (or `optional`) in every `@font-face` so text paints in a fallback immediately instead of blocking on the web font.
+- ✔ Preload the one or two critical `woff2` files via `hook_page_attachments` (see the [preload example](#http2--http3) above) — self-hosted, not from a third-party origin.
+- ✔ Self-host fonts. A `fonts.googleapis.com` request adds a DNS + TLS handshake to a third party on the critical path.
+- ⚠ Subset fonts to the glyphs you use; a full multilingual `woff2` can be 200 KB+ of render-blocking weight.
+
+### Third-party and embed budget
+
+Third-party scripts (tag managers, chat widgets, A/B tools) are the most common reason a site scores well in the lab and badly in the field.
+
+- ✔ Set a hard budget and track total third-party JS in Lighthouse / WebPageTest — every embed costs main-thread time it does not pay back.
+- ✔ Load non-critical third parties `defer`/`async` via `#attached['html_head']`, never as a global render-blocking library.
+- ⚠ Facade heavy embeds (YouTube, maps, chat): render a lightweight placeholder and only load the real widget on interaction (`lite-youtube`, `oembed_lazyload`).
+- ✘ Don't inject marketing tags with a render-blocking `<script>` in `html.html.twig`; route them through an `async`, consent-gated loader.
+- ⚠ Judge with field data (`CrUX`, Search Console's Core Web Vitals report), not just lab tools — real devices and networks tell a different story.
+
+---
+
 ## HTTP Caching
 
 The cheapest cache is the one the browser already has.
@@ -421,6 +498,12 @@ XDEBUG_TRIGGER=PROFILE curl https://my-site.ddev.site/
 - [Cache tags](https://www.drupal.org/docs/drupal-apis/cache-api/cache-tags)
 - [BigPipe technical concept](https://www.drupal.org/docs/8/core/modules/big-pipe/big-pipe-technical-concept)
 - [Setting up reverse proxy](https://www.drupal.org/docs/installing-drupal/trusted-host-settings)
+
+### Frontend / Core Web Vitals
+
+- [Web Vitals — LCP, CLS, INP (web.dev)](https://web.dev/articles/vitals)
+- [Optimize LCP and `fetchpriority` (web.dev)](https://web.dev/articles/optimize-lcp)
+- [Optimize INP (web.dev)](https://web.dev/articles/optimize-inp)
 
 ### Contrib modules worth knowing
 

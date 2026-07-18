@@ -9,6 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Site\Settings;
+use Drupal\drush_perf_audit\RenderPatterns;
 use Drush\Attributes as CLI;
 use Drush\Commands\DrushCommands;
 
@@ -133,12 +134,7 @@ final class PerfAuditCommands extends DrushCommands {
       return new RowsOfFields($rows);
     }
 
-    $patterns = [
-      'drupal_render() call' => '/\bdrupal_render\s*\(/',
-      'render() inside preprocess' => '/->\s*render\s*\(\s*\$build\s*\)/',
-      'raw #markup string' => '/#markup\'\s*=>\s*\$(?!safe|markup)[A-Za-z_]+(?!.*Markup::create)/',
-      'missing #cache (block build)' => '/public function build\(\)\s*\{(?:(?!#cache).){1,400}return\s*\[/s',
-    ];
+    $patterns = RenderPatterns::PATTERNS;
 
     $iterator = new \RecursiveIteratorIterator(
       new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
