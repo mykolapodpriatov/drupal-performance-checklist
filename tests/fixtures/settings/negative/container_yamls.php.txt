@@ -1,0 +1,11 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a settings file that loads services.production.yml must NOT be flagged.
+ *
+ * The required container_yamls assignment is present, so the missing-line
+ * check stays silent.
+ */
+
+$settings['container_yamls'][] = $app_root . '/' . $site_path . '/services.production.yml';
