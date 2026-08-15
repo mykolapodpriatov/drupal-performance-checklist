@@ -46,6 +46,7 @@ final class SettingsPatterns {
    */
   public const REQUIRED = [
     'missing trusted_host_patterns' => '/\$settings\s*\[\s*[\'"]trusted_host_patterns[\'"]\s*\]\s*=/',
+    'missing container_yamls (services.production.yml)' => '/\$settings\s*\[\s*[\'"]container_yamls[\'"]\s*\]\s*\[\s*\]\s*=[^;]*services\.production\.yml/',
   ];
 
 }

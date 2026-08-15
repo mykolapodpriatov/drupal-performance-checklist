@@ -1,0 +1,15 @@
+<?php
+
+/**
+ * @file
+ * Fixture: a settings file MISSING services.production.yml MUST be flagged.
+ *
+ * container_yamls is only mentioned in a comment, and the assignment loads
+ * services.dev.yml instead. A bare mention must not satisfy the required check.
+ */
+
+// TODO: load services.production.yml via container_yamls before going live.
+$settings['container_yamls'][] = $app_root . '/' . $site_path . '/services.dev.yml';
+$settings['trusted_host_patterns'] = [
+  '^www\.example\.com$',
+];

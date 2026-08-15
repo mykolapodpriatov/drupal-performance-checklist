@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `perf:settings-audit` now flags a missing
+  `$settings['container_yamls'][]` assignment that loads
+  `services.production.yml`.
 - `perf:settings-audit` Drush command (with `--file`) that greps a settings.php
   file for production-hardening antipatterns, backed by a dependency-free
   `SettingsPatterns` value object and positive/negative fixture unit tests.

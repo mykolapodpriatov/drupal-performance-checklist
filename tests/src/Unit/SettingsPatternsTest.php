@@ -59,6 +59,12 @@ final class SettingsPatternsTest extends TestCase {
         'negative/trusted_host.php.txt',
         TRUE,
       ],
+      'missing container_yamls (services.production.yml)' => [
+        'missing container_yamls (services.production.yml)',
+        'positive/container_yamls.php.txt',
+        'negative/container_yamls.php.txt',
+        TRUE,
+      ],
     ];
   }
 
