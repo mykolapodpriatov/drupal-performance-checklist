@@ -9,6 +9,7 @@ use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Site\Settings;
+use Drupal\drush_perf_audit\AuditVerdict;
 use Drupal\drush_perf_audit\RenderPatterns;
 use Drupal\drush_perf_audit\SettingsPatterns;
 use Drupal\drush_perf_audit\TwigPatterns;
@@ -87,6 +88,61 @@ final class PerfAuditCommands extends DrushCommands {
     $rows[] = $this->checkBigPipe();
 
     return new RowsOfFields($rows);
+  }
+
+  /**
+   * Run every check and exit non-zero when the site would not ship.
+   *
+   * The perf:audit command is the human-readable table and stays one. This is
+   * the same checks turned into an exit code, with a compact summary instead:
+   * nobody reads a table in CI logs, they read the last three lines.
+   *
+   * @param array<string, mixed> $options
+   *   Command options. 'fail-on' is 'fail' (the default) or 'warn'.
+   *
+   * @return int
+   *   0 when the site passes at the given threshold, 1 otherwise.
+   */
+  #[CLI\Command(name: 'perf:gate', aliases: ['pg'])]
+  #[CLI\Option(name: 'fail-on', description: "Lowest status that fails the gate: 'fail' or 'warn'.")]
+  #[CLI\Usage(name: 'drush perf:gate', description: 'Exit non-zero if any check FAILs.')]
+  #[CLI\Usage(name: 'drush perf:gate --fail-on=warn', description: 'Exit non-zero on a warning too.')]
+  public function gate(array $options = ['fail-on' => 'fail']): int {
+    $threshold = (string) ($options['fail-on'] ?? 'fail');
+    try {
+      $threshold = AuditVerdict::normalizeThreshold($threshold);
+    }
+    catch (\InvalidArgumentException $exception) {
+      $this->logger()->error($exception->getMessage());
+      return self::EXIT_FAILURE;
+    }
+
+    $rows = $this->audit()->getArrayCopy();
+
+    $tally = AuditVerdict::tally($rows);
+    $summary = [];
+    foreach ($tally as $status => $count) {
+      $summary[] = sprintf('%s=%d', $status, $count);
+    }
+    $this->logger()->notice(implode(' ', $summary));
+
+    if (!AuditVerdict::shouldFail($rows, $threshold)) {
+      $this->logger()->success(sprintf('perf:gate passed (--fail-on=%s).', $threshold));
+      return self::EXIT_SUCCESS;
+    }
+
+    if ($rows === []) {
+      // No rows is not a clean site: the checks did not run.
+      $this->logger()->error('perf:gate: no checks produced a result.');
+      return self::EXIT_FAILURE;
+    }
+
+    foreach (AuditVerdict::offenders($rows, $threshold) as $name) {
+      $this->logger()->error(sprintf('  %s', $name));
+    }
+    $this->logger()->error(sprintf('perf:gate failed (--fail-on=%s).', $threshold));
+
+    return self::EXIT_FAILURE;
   }
 
   /**

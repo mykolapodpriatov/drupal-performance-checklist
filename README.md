@@ -44,6 +44,21 @@ Three ways:
 
    See [`drush_perf_audit/`](./drush_perf_audit) for the module and its subcommands.
 
+4. **Gate your release on it.** `perf:audit` prints a table and exits 0 whatever
+   is in it, which makes it something a person has to remember to read.
+   `perf:gate` runs the same checks and turns them into an exit code:
+
+   ```bash
+   ddev drush perf:gate                 # non-zero if any check FAILs
+   ddev drush perf:gate --fail-on=warn  # non-zero on a warning too
+   ```
+
+   It prints a per-status tally and the names of the failing checks, not the
+   full table: nobody reads a table in CI logs. Informational rows can never
+   fail the build, because a gate with an exclusion list is a gate that means
+   nothing. An empty result is a failure rather than a pass, since no rows means
+   the checks did not run, which is a different thing from a green site.
+
 Markers used below:
 - ✔ = should be true in production
 - ✘ = should be false / off in production

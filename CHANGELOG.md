@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `perf:gate`: the same checks as `perf:audit`, turned into an exit code, so the
+  checklist can gate a release instead of being something a person has to
+  remember to read. `--fail-on=fail` (the default) or `--fail-on=warn`. Prints a
+  per-status tally and the failing check names rather than the full table.
+  Informational rows can never fail the build, and an empty result is a failure
+  rather than a pass, because no rows means the checks did not run. The decision
+  lives in the dependency-free `AuditVerdict`, so it is unit-tested without a
+  Drupal bootstrap.
 - `perf:settings-audit` now flags a missing
   `$settings['container_yamls'][]` assignment that loads
   `services.production.yml`.
