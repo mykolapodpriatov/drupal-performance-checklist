@@ -18,7 +18,7 @@ use Drupal\Core\Cache\Cache;
  */
 class CachedBlock {
 
-  public function build() {
+  public function build(): array {
     $build = [
       '#markup' => 'Hello',
     ];
