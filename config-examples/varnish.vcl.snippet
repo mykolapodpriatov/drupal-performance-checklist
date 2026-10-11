@@ -68,8 +68,13 @@ sub vcl_recv {
 }
 
 sub vcl_backend_response {
-    # Honour Drupal's max-age. Default to 1h if backend gave us nothing useful.
-    if (beresp.ttl <= 0s) {
+    # Honour Drupal's max-age. A zero TTL from no-cache, no-store, private,
+    # or max-age=0 means the response must not be stored. 1h is only a
+    # stand-in when the backend sent no lifetime at all.
+    if (beresp.http.Cache-Control ~ "(?i)no-cache|no-store|private|max-age=0([^0-9]|$)") {
+        set beresp.ttl = 0s;
+        set beresp.uncacheable = true;
+    } else if (beresp.ttl <= 0s) {
         set beresp.ttl = 1h;
     }
 
