@@ -12,7 +12,7 @@ namespace Drupal\my_module\Plugin\Block;
  */
 class UncachedBlock {
 
-  public function build() {
+  public function build(): array {
     return [
       '#markup' => 'Current time: ' . time(),
     ];

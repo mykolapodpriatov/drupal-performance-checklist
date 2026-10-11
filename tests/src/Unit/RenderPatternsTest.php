@@ -118,6 +118,18 @@ final class RenderPatternsTest extends TestCase {
   }
 
   /**
+   * An untyped build() is still the same antipattern.
+   *
+   * The positive fixture uses the return type BlockPluginInterface declares.
+   * The older form without a return type has to keep matching too.
+   */
+  public function testUntypedBlockBuildWithoutCacheIsFlagged(): void {
+    $regex = RenderPatterns::PATTERNS['missing #cache (block build)'];
+    $code = "public function build() {\n    return [\n      '#markup' => 'x',\n    ];\n  }";
+    self::assertSame(1, preg_match($regex, $code));
+  }
+
+  /**
    * Reads a fixture file relative to the fixtures directory.
    */
   private function readFixture(string $relative): string {

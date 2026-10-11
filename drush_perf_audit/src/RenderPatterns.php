@@ -28,7 +28,7 @@ final class RenderPatterns {
     'drupal_render() call' => '/\bdrupal_render\s*\(/',
     'render() inside preprocess' => '/->\s*render\s*\(\s*\$build\s*\)/',
     'raw #markup string' => '/#markup\'\s*=>\s*\$(?!safe|markup)[A-Za-z_]+(?!.*Markup::create)/',
-    'missing #cache (block build)' => '/public function build\(\)\s*\{(?:(?!#cache).){1,400}return\s*\[/s',
+    'missing #cache (block build)' => '/public function build\(\)\s*(?::\s*[^{]+)?\s*\{(?:(?!#cache).){1,400}return\s*\[/s',
   ];
 
 }
